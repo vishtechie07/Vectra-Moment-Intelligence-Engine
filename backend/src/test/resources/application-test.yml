@@ -1,0 +1,11 @@
+spring:
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
+
+vectramoment:
+  aws:
+    s3:
+      raw-bucket: test-raw
+      frames-bucket: test-frames
+  opensearch:
+    endpoint: http://localhost:9200

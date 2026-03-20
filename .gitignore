@@ -1,0 +1,37 @@
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Maven / backend
+backend/target/
+**/target/
+
+# CDK / infra
+infra/cdk.out/
+infra/target/
+
+# IDE / Cursor / transcripts
+.vscode/
+.idea/
+.cursor/
+agent-transcripts/
+terminals/
+*.iml
+
+# OS
+.DS_Store
+
+# Logs / temp
+*.log
+*.tmp
+*.swp
+
+# Secrets (if present)
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+

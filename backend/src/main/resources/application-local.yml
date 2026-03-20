@@ -1,0 +1,26 @@
+server:
+  port: 8081
+
+logging:
+  level:
+    org.apache.kafka.clients.producer.ProducerConfig: WARN
+    org.apache.kafka.clients.consumer.ConsumerConfig: WARN
+    org.apache.kafka.clients.admin.AdminClientConfig: WARN
+
+spring:
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
+
+vectramoment:
+  kafka:
+    video-ingested-topic: video.ingested.local
+    frame-extract-group: frame-extract-local
+    vision-embed-group: vision-embed-local
+  storage:
+    mode: local
+    local-dir: ${VECTRAMOMENT_STORAGE_LOCAL_DIR:${user.dir}/target/vectramoment-uploads}
+  opensearch:
+    endpoint: ${VECTRAMOMENT_OPENSEARCH_ENDPOINT:http://localhost:9200}
+    # Default OpenSearch Docker demo credentials (optional; omit if no auth)
+    username: admin
+    password: admin

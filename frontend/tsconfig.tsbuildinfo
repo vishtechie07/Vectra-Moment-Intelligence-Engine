@@ -1,0 +1,1 @@
+{"root":["./src/env.d.ts","./src/main.ts","./src/api/client.ts","./src/router/index.ts","./src/stores/openaikeystore.ts","./src/app.vue","./src/components/keymodal.vue","./src/components/timemachinesearch.vue","./src/components/videoplayer.vue","./src/views/dashboard.vue"],"version":"5.6.3"}

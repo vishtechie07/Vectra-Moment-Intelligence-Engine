@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased text-slate-800 bg-slate-50/80;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+}
+
+/* Subtle mesh gradient background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(139, 92, 246, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(99, 102, 241, 0.08), transparent),
+    radial-gradient(ellipse 50% 30% at 0% 80%, rgba(236, 72, 153, 0.06), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+/* Custom scrollbar for result list */
+.scroll-result::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-result::-webkit-scrollbar-track {
+  @apply bg-slate-100 rounded-full;
+}
+.scroll-result::-webkit-scrollbar-thumb {
+  @apply bg-brand-200 rounded-full hover:bg-brand-300;
+}

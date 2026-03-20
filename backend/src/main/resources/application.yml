@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: vectramoment-backend
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: vectramoment
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+server:
+  port: 8080
+
+vectramoment:
+  kafka:
+    video-ingested-topic: video.ingested
+  storage:
+    mode: s3
+  aws:
+    region: ${AWS_REGION:ap-southeast-2}
+    s3:
+      raw-bucket: ${S3_RAW_BUCKET:vectramoment-raw-videos}
+      frames-bucket: ${S3_FRAMES_BUCKET:vectramoment-frames}
+  opensearch:
+    endpoint: ${OPENSEARCH_ENDPOINT:http://localhost:9200}
