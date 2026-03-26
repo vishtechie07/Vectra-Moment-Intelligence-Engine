@@ -25,6 +25,7 @@ terminals/
 *.log
 *.tmp
 *.swp
+*.tsbuildinfo
 
 # Secrets (if present)
 .env
@@ -34,4 +35,8 @@ terminals/
 *.crt
 *.p12
 *.jks
+
+# Test media (avoid committing large binaries)
+test_videos/*.mp4
+infra/test_videos/*.mp4
 

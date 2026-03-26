@@ -8,6 +8,11 @@ Production-grade system: upload videos, AI analysis (GPT-4o Vision + embeddings)
 - **Frontend**: Vue 3, Vite, Tailwind, Pinia, Video.js
 - **Infra**: AWS CDK (Java), region `ap-southeast-2`
 
+## Project status
+
+- **Primary supported mode (portfolio/demo):** Local Docker stack.
+- **AWS mode:** Optional/experimental path for cloud deployment.
+
 ## Quick start
 
 ### One command (PowerShell)
@@ -50,11 +55,34 @@ docker compose up -d --build
 
 Open **http://localhost:5173**. The frontend is served by Nginx; `/api` is proxied to the backend. Backend uses `kafka:29092` and `opensearch:9200`, so the ingest → frame-extract → vision/embed pipeline runs correctly.
 
+### Demo flow (2-3 minutes)
+
+1. Open `http://localhost:5173`.
+2. Set your OpenAI key from **Update API Key**.
+3. Upload a short video (5-20s).
+4. Wait for `Processing complete (N frames)`.
+5. Run Time Machine queries like `publish`, `warning`, `finger`.
+6. Click results to jump video to that timestamp.
+
+### Architecture (local demo mode)
+
+```text
+Frontend (Vue/Nginx)
+   -> Backend API (Spring Boot)
+      -> Kafka (video.ingested.local -> frames.ready)
+      -> Frame extraction (JavaCV, 1 fps)
+      -> OpenAI Vision + Embeddings/LLM comparison
+      -> OpenSearch (frame index + retrieval)
+      -> Local storage (/app/uploads in Docker)
+```
+
 ### Backend
 
 - `POST /api/videos/upload` — multipart file + optional `X-OpenAI-Key`
 - `GET /api/videos/{videoId}/playback-url` — presigned S3 URL
+- `GET /api/videos/{videoId}/processing-status` — pipeline state (`queued|extracting|embedding|ready|failed`) + `framesIndexed` + status `message`
 - `GET /api/search?q=...&videoId=...` — **AI comparison** when `videoId` is set (see below); vector search when omitted (requires `X-OpenAI-Key`)
+- `GET /api/metrics` — in-memory counters for processing states + OpenAI retries/timeouts/failures
 
 ### Time Machine Search: AI comparison (why we switched from vector search)
 
@@ -90,6 +118,8 @@ cd infra && mvn compile && cdk bootstrap && cdk deploy
 
 After deploy, stack outputs: `RawVideosBucket`, `FramesBucket`, `VideoMetadataTable`, `OpenSearchCollectionName`.
 
+> Note: AWS is not required for the default portfolio demo flow.
+
 ### Running backend against AWS
 
 1. **Get resource names** from stack outputs (CloudFormation console or `aws cloudformation describe-stacks --stack-name VectraMomentStack --query 'Stacks[0].Outputs'`).
@@ -98,7 +128,7 @@ After deploy, stack outputs: `RawVideosBucket`, `FramesBucket`, `VideoMetadataTa
    ```bash
    aws opensearchserverless get-collection --id vectramoment --region ap-southeast-2 --query 'collectionDetail.collectionEndpoint' --output text
    ```
-   Use this as `OPENSEARCH_ENDPOINT` (HTTPS URL). The backend will need IAM signing for OpenSearch Serverless; currently it uses a plain HTTP client suited for local OpenSearch.
+   Use this as `OPENSEARCH_ENDPOINT` (HTTPS URL). The backend supports IAM SigV4 signing for OpenSearch Serverless when using an HTTPS endpoint and no basic auth.
 
 3. **Set env and run backend** (no `local` profile; ensure AWS credentials are configured):
    ```powershell
@@ -110,6 +140,36 @@ After deploy, stack outputs: `RawVideosBucket`, `FramesBucket`, `VideoMetadataTa
    Kafka still defaults to `localhost:9092`; for full AWS you would use Amazon MSK and set `KAFKA_BOOTSTRAP_SERVERS`.
 
 4. **Optional**: Use an `application-aws.yml` profile that sets `vectramoment.storage.mode: s3` and the above properties from env.
+
+## Technical assumptions
+
+- OpenAI key is provided per request using `X-OpenAI-Key`; key is never persisted server-side.
+- Frame extraction is fixed at ~1 frame/second; processing cost/latency scales roughly linearly with video duration.
+- In local Docker mode, storage is filesystem-backed (`/app/uploads`) and Kafka/OpenSearch are single-node dev topology.
+- `GET /api/metrics` uses in-memory counters (reset when backend restarts); this is observability for local ops, not durable analytics.
+- `GET /api/videos/{videoId}/processing-status` reflects app-level state tracking and may initialize to `processing` if backend restarts mid-job.
+
+## Known limitations (portfolio scope)
+
+- Local mode is the primary tested path.
+- AWS path is optional and may require additional production hardening (MSK setup, IAM policy tuning, monitoring/alerts, CI/CD deployment pipeline).
+- For long videos, processing time scales with frame count (1 fps extraction + AI calls per frame).
+- OpenAI rate-limits can still impact throughput under heavy parallel uploads (bounded retries are implemented; no queue backpressure yet).
+
+## Roadmap
+
+- Add `application-aws.yml` and documented one-command AWS profile startup.
+- Add deployment target (ECS) + CI/CD workflow.
+- Add production observability dashboard and alarms.
+
+## AWS future work (production path)
+
+- Replace local Kafka with MSK and configure topic replication/ISR for multi-AZ reliability.
+- Move local uploads/frames fully to S3 and add lifecycle/retention policies.
+- Persist processing state and metrics in DynamoDB/CloudWatch instead of in-memory maps.
+- Add async job orchestration + DLQ/retry strategy for failed frame/embedding tasks.
+- Enforce least-privilege IAM and add KMS-managed encryption policies for all data stores.
+- Add autoscaling compute target (ECS/Fargate or EKS) and deployment pipeline (build, scan, deploy, rollback).
 
 ## Tests
 
