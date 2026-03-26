@@ -2,6 +2,7 @@ package com.vectramoment.web;
 
 import com.vectramoment.domain.VideoMetadata;
 import com.vectramoment.ingestion.IngestionService;
+import com.vectramoment.processing.ProcessingStatusService;
 import com.vectramoment.search.OpenSearchVectorService;
 import com.vectramoment.web.dto.VideoUploadResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class VideoUploadController {
     private final IngestionService ingestionService;
     private final S3Client s3Client;
     private final OpenSearchVectorService searchService;
+    private final ProcessingStatusService processingStatusService;
     private final String rawBucket;
     private final String storageMode;
     private final Path localDir;
@@ -40,12 +42,14 @@ public class VideoUploadController {
     public VideoUploadController(IngestionService ingestionService,
                                  S3Client s3Client,
                                  OpenSearchVectorService searchService,
+                                 ProcessingStatusService processingStatusService,
                                  @Value("${vectramoment.aws.s3.raw-bucket}") String rawBucket,
                                  @Value("${vectramoment.storage.mode:s3}") String storageMode,
                                  @Value("${vectramoment.storage.local-dir:}") String localDir) {
         this.ingestionService = ingestionService;
         this.s3Client = s3Client;
         this.searchService = searchService;
+        this.processingStatusService = processingStatusService;
         this.rawBucket = rawBucket;
         this.storageMode = storageMode != null ? storageMode : "s3";
         this.localDir = (localDir != null && !localDir.isBlank()) ? Path.of(localDir) : null;
@@ -108,8 +112,11 @@ public class VideoUploadController {
     @GetMapping("/{videoId}/processing-status")
     public ResponseEntity<Map<String, Object>> processingStatus(@PathVariable String videoId) {
         long framesIndexed = searchService.countFramesByVideoId(videoId);
-        String status = framesIndexed > 0 ? "ready" : "processing";
-        return ResponseEntity.ok(Map.of("status", status, "framesIndexed", framesIndexed));
+        var snapshot = processingStatusService.getStatus(videoId, framesIndexed);
+        return ResponseEntity.ok(Map.of(
+                "status", snapshot.status(),
+                "framesIndexed", snapshot.framesIndexed(),
+                "message", snapshot.message()));
     }
 
     @GetMapping("/{videoId}/stream")

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import com.vectramoment.processing.ProcessingStatusService;
 
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -27,15 +28,18 @@ public class IngestionService {
     private final String rawBucket;
     private final String storageMode;
     private final Path localDir;
+    private final ProcessingStatusService processingStatusService;
 
     public IngestionService(S3Client s3Client,
                             KafkaTemplate<String, VideoIngestedEvent> kafkaTemplate,
+                            ProcessingStatusService processingStatusService,
                             @Value("${vectramoment.kafka.video-ingested-topic:video.ingested}") String videoIngestedTopic,
                             @Value("${vectramoment.aws.s3.raw-bucket}") String rawBucket,
                             @Value("${vectramoment.storage.mode:s3}") String storageMode,
                             @Value("${vectramoment.storage.local-dir:}") String localDir) {
         this.s3Client = s3Client;
         this.kafkaTemplate = kafkaTemplate;
+        this.processingStatusService = processingStatusService;
         this.videoIngestedTopic = videoIngestedTopic;
         this.rawBucket = rawBucket;
         this.storageMode = storageMode != null ? storageMode : "s3";
@@ -44,6 +48,7 @@ public class IngestionService {
 
     public VideoMetadata ingest(String fileName, long contentLength, InputStream inputStream, String openAiKey) throws Exception {
         var videoId = UUID.randomUUID().toString();
+        processingStatusService.markQueued(videoId);
         var s3Key = "videos/" + videoId + "/" + fileName;
         if ("local".equalsIgnoreCase(storageMode) && localDir != null) {
             Path dir = localDir.resolve("videos").resolve(videoId);

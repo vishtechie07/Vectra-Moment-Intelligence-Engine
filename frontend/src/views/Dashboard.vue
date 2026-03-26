@@ -121,27 +121,32 @@ function startProcessingPoll(videoId: string) {
   if (processingPollTimer) clearInterval(processingPollTimer)
   const pollIntervalMs = 3000
   const maxPolls = 80
-  const maxReadyPolls = 30
-  const minReadyPollsBeforeStable = 15 // wait ~45s after first "ready" before trusting stable (avoids stopping at 2 when backend still indexing 16)
   let polls = 0
-  let maxFramesSeen = 0
-  let readyPolls = 0
-  let lastFramesIndexed = -1
   processingPollTimer = setInterval(async () => {
     polls++
     try {
-      const { data } = await client.get<{ status: string; framesIndexed: number }>(`/videos/${videoId}/processing-status`)
+      const { data } = await client.get<{ status: string; framesIndexed: number; message?: string }>(`/videos/${videoId}/processing-status`)
       if (data.status === 'ready') {
-        maxFramesSeen = Math.max(maxFramesSeen, data.framesIndexed)
-        readyPolls++
-        const stable = readyPolls >= minReadyPollsBeforeStable && lastFramesIndexed === data.framesIndexed
-        lastFramesIndexed = data.framesIndexed
-        if (stable || readyPolls >= maxReadyPolls) {
-          if (processingPollTimer) clearInterval(processingPollTimer)
-          processingPollTimer = null
-          uploadStatus.value = `Processing complete (${maxFramesSeen} frames). You can use Time Machine search.`
-          return
-        }
+        if (processingPollTimer) clearInterval(processingPollTimer)
+        processingPollTimer = null
+        uploadStatus.value = `Processing complete (${data.framesIndexed} frames). You can use Time Machine search.`
+        return
+      }
+      if (data.status === 'failed') {
+        if (processingPollTimer) clearInterval(processingPollTimer)
+        processingPollTimer = null
+        uploadError.value = true
+        uploadStatus.value = data.message || 'Processing failed. Check backend logs and retry.'
+        return
+      }
+      if (data.status === 'queued') {
+        uploadStatus.value = 'Queued for processing...'
+      } else if (data.status === 'extracting') {
+        uploadStatus.value = 'Extracting frames...'
+      } else if (data.status === 'embedding') {
+        uploadStatus.value = 'Analyzing and indexing frames...'
+      } else {
+        uploadStatus.value = 'Processing...'
       }
     } catch {
       // ignore; will retry
@@ -149,9 +154,7 @@ function startProcessingPoll(videoId: string) {
     if (polls >= maxPolls) {
       if (processingPollTimer) clearInterval(processingPollTimer)
       processingPollTimer = null
-      uploadStatus.value = maxFramesSeen > 0
-        ? `Processing complete (${maxFramesSeen} frames). You can use Time Machine search.`
-        : 'Processing is taking longer than expected. Try Time Machine search in a moment.'
+      uploadStatus.value = 'Processing is taking longer than expected. Check status/logs and try search in a moment.'
     }
   }, pollIntervalMs)
 }

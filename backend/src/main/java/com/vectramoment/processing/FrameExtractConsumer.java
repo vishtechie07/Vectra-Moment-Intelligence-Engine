@@ -11,21 +11,25 @@ public class FrameExtractConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(FrameExtractConsumer.class);
     private final FrameExtractService frameExtractService;
+    private final ProcessingStatusService processingStatusService;
 
-    public FrameExtractConsumer(FrameExtractService frameExtractService) {
+    public FrameExtractConsumer(FrameExtractService frameExtractService, ProcessingStatusService processingStatusService) {
         this.frameExtractService = frameExtractService;
+        this.processingStatusService = processingStatusService;
     }
 
     @KafkaListener(topics = "${vectramoment.kafka.video-ingested-topic:video.ingested}", containerFactory = "videoIngestedListenerFactory")
     public void onVideoIngested(VideoIngestedEvent event) {
         log.info("Received video.ingested videoId={} local={} hasKey={}", event.videoId(), event.localPath() != null, event.openAiKey() != null && !event.openAiKey().isBlank());
         try {
+            processingStatusService.markExtracting(event.videoId());
             if (event.localPath() != null && !event.localPath().isBlank()) {
                 frameExtractService.processVideoFromLocal(event.videoId(), event.localPath(), event.openAiKey());
             } else {
                 frameExtractService.processVideo(event.videoId(), event.s3Key(), event.openAiKey());
             }
         } catch (Exception e) {
+            processingStatusService.markFailed(event.videoId(), "Frame extraction failed");
             log.error("Frame extraction failed for videoId={}", event.videoId(), e);
         }
     }
