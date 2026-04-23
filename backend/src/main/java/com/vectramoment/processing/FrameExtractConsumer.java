@@ -26,7 +26,8 @@ public class FrameExtractConsumer {
             if (event.localPath() != null && !event.localPath().isBlank()) {
                 frameExtractService.processVideoFromLocal(event.videoId(), event.localPath(), event.openAiKey());
             } else {
-                frameExtractService.processVideo(event.videoId(), event.s3Key(), event.openAiKey());
+                processingStatusService.markFailed(event.videoId(), "Missing local video path");
+                log.warn("Skipping frame extraction for videoId={} due to missing local path", event.videoId());
             }
         } catch (Exception e) {
             processingStatusService.markFailed(event.videoId(), "Frame extraction failed");

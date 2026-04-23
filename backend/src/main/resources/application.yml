@@ -21,11 +21,7 @@ vectramoment:
   kafka:
     video-ingested-topic: video.ingested
   storage:
-    mode: s3
-  aws:
-    region: ${AWS_REGION:ap-southeast-2}
-    s3:
-      raw-bucket: ${S3_RAW_BUCKET:vectramoment-raw-videos}
-      frames-bucket: ${S3_FRAMES_BUCKET:vectramoment-frames}
+    mode: local
+    local-dir: ${VECTRAMOMENT_STORAGE_LOCAL_DIR:${user.dir}/target/vectramoment-uploads}
   opensearch:
     endpoint: ${OPENSEARCH_ENDPOINT:http://localhost:9200}

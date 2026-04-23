@@ -17,8 +17,7 @@ import java.util.concurrent.TimeUnit;
 import static org.awaitility.Awaitility.await;
 
 @SpringBootTest(properties = {
-        "vectramoment.aws.s3.raw-bucket=test-bucket",
-        "vectramoment.aws.s3.frames-bucket=test-frames",
+        "vectramoment.storage.local-dir=${java.io.tmpdir}/vectramoment-test",
         "vectramoment.opensearch.endpoint=http://localhost:9200"
 })
 @EmbeddedKafka(partitions = 1, topics = { KafkaConfig.TOPIC_VIDEO_INGESTED, KafkaConfig.TOPIC_FRAMES_READY }, brokerProperties = { "listeners=PLAINTEXT://localhost:9092", "port=9092" })

@@ -42,7 +42,6 @@ public class SearchController {
         try {
             List<SearchHit> hits;
             if (videoIdFilter != null && !videoIdFilter.isBlank()) {
-                // AI comparison: LLM selects matching frames from descriptions (no vector threshold)
                 List<IndexedFrame> frames = searchService.listFramesByVideoId(videoIdFilter);
                 List<IndexedFrame> matching = visionService.selectMatchingFrames(query, frames, openAiKey);
                 hits = matching.stream()
@@ -50,7 +49,6 @@ public class SearchController {
                         .toList();
                 log.info("Search (AI comparison) q={} videoId={} hits={}", query, videoIdFilter, hits.size());
             } else {
-                // No videoId: fallback to vector search across all videos
                 float[] embedding = visionService.embedQuery(query, openAiKey);
                 hits = searchService.search(embedding, null);
                 log.info("Search (vector) q={} hits={}", query, hits.size());

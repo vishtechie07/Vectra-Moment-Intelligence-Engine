@@ -6,17 +6,17 @@ frontend/dist/
 backend/target/
 **/target/
 
-# CDK / infra
-infra/cdk.out/
-infra/target/
-
-# IDE / Cursor / transcripts
+# IDE / local tooling
 .vscode/
 .idea/
 .cursor/
 agent-transcripts/
 terminals/
 *.iml
+
+# Infra artifacts (if folder kept locally)
+infra/cdk.out/
+infra/test_videos/
 
 # OS
 .DS_Store
@@ -38,5 +38,4 @@ terminals/
 
 # Test media (avoid committing large binaries)
 test_videos/*.mp4
-infra/test_videos/*.mp4
 

@@ -82,10 +82,7 @@ public class OpenAIVisionService {
         }
     }
 
-    /**
-     * Uses the LLM to select which frames match the search query (AI comparison).
-     * Sends the query and frame descriptions; returns only frames the model considers relevant.
-     */
+    /** LLM picks matching frame timestamps from descriptions. */
     public List<IndexedFrame> selectMatchingFrames(String query, List<IndexedFrame> frames, String apiKey) {
         if (apiKey == null || apiKey.isBlank()) throw new IllegalArgumentException("OpenAI API key required");
         if (frames == null || frames.isEmpty()) return List.of();
@@ -117,9 +114,7 @@ public class OpenAIVisionService {
                 }
                 return matching;
             }
-        } catch (Exception ignored) {
-            // Fallback below for non-JSON model output.
-        }
+        } catch (Exception ignored) { /* parse numbers from text */ }
         Matcher matcher = Pattern.compile("\\b\\d+\\b").matcher(cleaned);
         while (matcher.find()) {
             matching.add(Integer.parseInt(matcher.group()));

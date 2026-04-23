@@ -29,7 +29,6 @@ public class OpenSearchVectorService {
     private static final Logger log = LoggerFactory.getLogger(OpenSearchVectorService.class);
     private static final String EMBEDDING_FIELD = "embedding";
     private static final int K = 20;
-    /** Minimum similarity score to include a hit. 0.45 balances recall (publish/finger match) vs filtering irrelevant (e.g. "animal"). */
     private static final double MIN_SCORE_THRESHOLD = 0.45;
 
     private final OpenSearchClient client;
@@ -80,9 +79,8 @@ public class OpenSearchVectorService {
             return List.of();
         }
         boolean filterByVideo = videoIdFilter != null && !videoIdFilter.isBlank();
-        // Prefer bool+filter when filter present; fallback to KNN then filter in-memory if 0 hits (e.g. index created without index.knn)
         var sr = SearchRequest.of(s -> {
-            s.index(IndexName.FRAMES).size(filterByVideo ? K * 2 : K); // fetch more when we may filter in-memory
+            s.index(IndexName.FRAMES).size(filterByVideo ? K * 2 : K);
             s.query(q -> {
                 if (filterByVideo) {
                     return q.bool(b -> b
@@ -97,7 +95,6 @@ public class OpenSearchVectorService {
         SearchResponse<Map<String, Object>> response = (SearchResponse<Map<String, Object>>) (SearchResponse<?>) client.search(sr, Map.class);
         List<SearchHit> hits = parseHits(response);
         if (filterByVideo && hits.isEmpty()) {
-            // Fallback: plain KNN then filter by videoId (works when index lacks index.knn and bool+knn fails)
             final String vIdFilter = videoIdFilter != null ? videoIdFilter : "";
             var fallback = SearchRequest.of(s -> s.index(IndexName.FRAMES).size(100)
                     .query(q -> q.knn(k -> k.field(EMBEDDING_FIELD).vector(queryEmbedding).k(100))));
@@ -135,7 +132,6 @@ public class OpenSearchVectorService {
         return hits;
     }
 
-    /** Returns frames (videoId, timestamp, description) for the given video. Used for AI comparison search. */
     public List<IndexedFrame> listFramesByVideoId(String videoId) throws IOException {
         if (videoId == null || videoId.isBlank()) return List.of();
         if (!client.indices().exists(ExistsRequest.of(e -> e.index(IndexName.FRAMES))).value()) {
@@ -160,7 +156,6 @@ public class OpenSearchVectorService {
         return out;
     }
 
-    /** Returns number of indexed frames for the given video (for processing-status). */
     public long countFramesByVideoId(String videoId) {
         if (videoId == null || videoId.isBlank()) return 0;
         try {

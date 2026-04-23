@@ -3,9 +3,7 @@ spring:
     bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
 
 vectramoment:
-  aws:
-    s3:
-      raw-bucket: test-raw
-      frames-bucket: test-frames
+  storage:
+    local-dir: ${java.io.tmpdir}/vectramoment-test
   opensearch:
     endpoint: http://localhost:9200

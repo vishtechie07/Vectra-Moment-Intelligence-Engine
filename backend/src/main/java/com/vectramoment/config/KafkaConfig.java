@@ -52,7 +52,6 @@ public class KafkaConfig {
         return TopicBuilder.name(TOPIC_FRAMES_READY).partitions(3).replicas(1).build();
     }
 
-    /** Ensure topics exist, then start listener containers. Retries allow Kafka to be ready after healthcheck. */
     @Bean
     public ApplicationRunner kafkaTopicInitializer(KafkaAdmin admin, KafkaListenerEndpointRegistry registry) {
         return args -> {

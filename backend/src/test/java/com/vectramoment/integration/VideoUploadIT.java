@@ -5,8 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.TestPropertySource;
-import software.amazon.awssdk.services.s3.S3Client;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
@@ -15,7 +13,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(com.vectramoment.web.VideoUploadController.class)
-@TestPropertySource(properties = "vectramoment.aws.s3.raw-bucket=test-bucket")
 class VideoUploadIT {
 
     @Autowired
@@ -23,9 +20,6 @@ class VideoUploadIT {
 
     @MockitoBean
     private IngestionService ingestionService;
-
-    @MockitoBean
-    private S3Client s3Client;
 
     @Test
     void uploadRejectsEmptyFile() throws Exception {

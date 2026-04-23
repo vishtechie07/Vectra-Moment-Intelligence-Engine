@@ -8,9 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,22 +16,16 @@ import java.nio.file.Path;
 public class VisionEmbedConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(VisionEmbedConsumer.class);
-    private final S3Client s3Client;
     private final OpenAIVisionService visionService;
     private final OpenSearchVectorService searchService;
     private final ProcessingStatusService processingStatusService;
-    private final String framesBucket;
 
-    public VisionEmbedConsumer(S3Client s3Client,
-                               OpenAIVisionService visionService,
+    public VisionEmbedConsumer(OpenAIVisionService visionService,
                                OpenSearchVectorService searchService,
-                               ProcessingStatusService processingStatusService,
-                               @Value("${vectramoment.aws.s3.frames-bucket}") String framesBucket) {
-        this.s3Client = s3Client;
+                               ProcessingStatusService processingStatusService) {
         this.visionService = visionService;
         this.searchService = searchService;
         this.processingStatusService = processingStatusService;
-        this.framesBucket = framesBucket;
     }
 
     @KafkaListener(topics = KafkaConfig.TOPIC_FRAMES_READY, containerFactory = "frameReadyListenerFactory")
@@ -55,9 +46,11 @@ public class VisionEmbedConsumer {
         int indexed = 0;
         for (FrameEntry frame : event.frames()) {
             try {
-                byte[] imageBytes = frame.localPath() != null && !frame.localPath().isBlank()
-                        ? Files.readAllBytes(Path.of(frame.localPath()))
-                        : s3Client.getObject(GetObjectRequest.builder().bucket(framesBucket).key(frame.s3Key()).build()).readAllBytes();
+                if (frame.localPath() == null || frame.localPath().isBlank()) {
+                    log.warn("Skipping frame with missing local path videoId={} t={}", event.videoId(), frame.timestampSeconds());
+                    continue;
+                }
+                byte[] imageBytes = Files.readAllBytes(Path.of(frame.localPath()));
                 SemanticFrameResult result = visionService.analyzeFrame(imageBytes, event.openAiKey());
                 searchService.indexFrame(event.videoId(), frame.timestampSeconds(), result.description(), result.embedding());
                 indexed++;

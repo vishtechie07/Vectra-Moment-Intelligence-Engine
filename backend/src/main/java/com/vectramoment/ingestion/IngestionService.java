@@ -6,9 +6,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import com.vectramoment.processing.ProcessingStatusService;
 
 import java.io.InputStream;
@@ -22,27 +19,18 @@ import java.util.concurrent.TimeUnit;
 public class IngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(IngestionService.class);
-    private final S3Client s3Client;
     private final KafkaTemplate<String, VideoIngestedEvent> kafkaTemplate;
     private final String videoIngestedTopic;
-    private final String rawBucket;
-    private final String storageMode;
     private final Path localDir;
     private final ProcessingStatusService processingStatusService;
 
-    public IngestionService(S3Client s3Client,
-                            KafkaTemplate<String, VideoIngestedEvent> kafkaTemplate,
+    public IngestionService(KafkaTemplate<String, VideoIngestedEvent> kafkaTemplate,
                             ProcessingStatusService processingStatusService,
                             @Value("${vectramoment.kafka.video-ingested-topic:video.ingested}") String videoIngestedTopic,
-                            @Value("${vectramoment.aws.s3.raw-bucket}") String rawBucket,
-                            @Value("${vectramoment.storage.mode:s3}") String storageMode,
                             @Value("${vectramoment.storage.local-dir:}") String localDir) {
-        this.s3Client = s3Client;
         this.kafkaTemplate = kafkaTemplate;
         this.processingStatusService = processingStatusService;
         this.videoIngestedTopic = videoIngestedTopic;
-        this.rawBucket = rawBucket;
-        this.storageMode = storageMode != null ? storageMode : "s3";
         this.localDir = (localDir != null && !localDir.isBlank()) ? Path.of(localDir) : null;
     }
 
@@ -50,29 +38,21 @@ public class IngestionService {
         var videoId = UUID.randomUUID().toString();
         processingStatusService.markQueued(videoId);
         var s3Key = "videos/" + videoId + "/" + fileName;
-        if ("local".equalsIgnoreCase(storageMode) && localDir != null) {
-            Path dir = localDir.resolve("videos").resolve(videoId);
-            Files.createDirectories(dir);
-            Path file = dir.resolve(sanitizeFileName(fileName));
-            Files.copy(inputStream, file);
-            var event = new VideoIngestedEvent(videoId, s3Key, openAiKey, file.toAbsolutePath().toString());
-            log.info("Sending to topic={} videoId={} localPath={} hasKey={}", videoIngestedTopic, videoId, event.localPath() != null, openAiKey != null && !openAiKey.isBlank());
-            try {
-                kafkaTemplate.send(videoIngestedTopic, videoId, event).get(10, TimeUnit.SECONDS);
-                log.info("Kafka send completed videoId={}", videoId);
-            } catch (Exception e) {
-                log.warn("Kafka send failed (video saved locally): {}", e.getMessage());
-            }
-            return new VideoMetadata(videoId, s3Key, fileName, contentLength, Instant.now());
+        if (localDir == null) {
+            throw new IllegalStateException("Local storage directory not configured");
         }
-        s3Client.putObject(PutObjectRequest.builder()
-                        .bucket(rawBucket)
-                        .key(s3Key)
-                        .contentLength(contentLength)
-                        .build(),
-                RequestBody.fromInputStream(inputStream, contentLength));
-        var event = new VideoIngestedEvent(videoId, s3Key, openAiKey);
-        kafkaTemplate.send(videoIngestedTopic, videoId, event);
+        Path dir = localDir.resolve("videos").resolve(videoId);
+        Files.createDirectories(dir);
+        Path file = dir.resolve(sanitizeFileName(fileName));
+        Files.copy(inputStream, file);
+        var event = new VideoIngestedEvent(videoId, s3Key, openAiKey, file.toAbsolutePath().toString());
+        log.info("Sending to topic={} videoId={} localPath={} hasKey={}", videoIngestedTopic, videoId, event.localPath() != null, openAiKey != null && !openAiKey.isBlank());
+        try {
+            kafkaTemplate.send(videoIngestedTopic, videoId, event).get(10, TimeUnit.SECONDS);
+            log.info("Kafka send completed videoId={}", videoId);
+        } catch (Exception e) {
+            log.warn("Kafka send failed (video saved locally): {}", e.getMessage());
+        }
         return new VideoMetadata(videoId, s3Key, fileName, contentLength, Instant.now());
     }
 
