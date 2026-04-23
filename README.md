@@ -1,131 +1,166 @@
 # VectraMoment — Semantic Video Intelligence Engine
 
-Production-grade system: upload videos, AI analysis (GPT-4o Vision + embeddings), and natural-language search to find timestamps.
+## What this project is
+
+VectraMoment is an end-to-end demo of **semantic video search**: you upload a video, the system extracts frames, describes them with vision AI, indexes them, and lets you find moments with **natural-language queries** (the “Time Machine” flow). Results link to timestamps so you can jump playback to the right instant.
+
+It is built as a **portfolio-grade, locally runnable stack** (Docker + Spring Boot + Vue): event-driven processing, vector-capable search storage, and a deliberate **LLM-based matching** path for per-video search to reduce false negatives/positives from raw embedding thresholds alone.
+
+## Features
+
+- Multipart video upload with processing status (`queued` → `extracting` → `embedding` → `ready` / `failed`).
+- Kafka-driven pipeline: ingest → frame extraction (~1 fps via JavaCV) → vision description + embeddings → OpenSearch indexing.
+- Dashboard upload, Video.js playback, and Time Machine search scoped to a video or across the index.
+- In-memory `/api/metrics` for local debugging (processing states, OpenAI retry/timeout counts).
+- OpenAI API key supplied **only** per request (`X-OpenAI-Key`); not stored in server env or config files.
+
+## Architecture
+
+### Components
+
+| Layer | Role |
+|--------|------|
+| **Frontend** (Vue 3, Vite, Tailwind, Pinia) | Upload UI, API key modal (memory-only store), Axios interceptor for `X-OpenAI-Key`, search and player. |
+| **Backend** (Java 21, Spring Boot 3.4) | REST API, Kafka producers/consumers, frame extraction, OpenAI Vision + embeddings, OpenSearch client, local filesystem storage. |
+| **Kafka** | Decouples ingestion from CPU-heavy extract/embed work; topics configurable per profile (e.g. `video.ingested.local` for `local`). |
+| **OpenSearch** | Frame documents: descriptions, embeddings for k-NN, metadata for playback and filtering. |
+| **Local storage** | Uploaded files and derived assets under a configurable directory (`target/vectramoment-uploads` locally, `/app/uploads` in Docker). |
+
+### Data flow (high level)
+
+```mermaid
+flowchart LR
+  subgraph client [Browser]
+    UI[Vue app]
+  end
+  subgraph api [Spring Boot]
+    REST[REST controllers]
+    ING[Ingestion]
+    FE[Frame extract consumer]
+    VE[Vision / embed consumer]
+    SRCH[Search services]
+  end
+  subgraph data [Infrastructure]
+    K[Kafka]
+    OS[OpenSearch]
+    FS[Local FS]
+  end
+  UI --> REST
+  REST --> ING
+  ING --> FS
+  ING --> K
+  K --> FE
+  FE --> FS
+  FE --> K
+  K --> VE
+  VE --> OS
+  REST --> SRCH
+  SRCH --> OS
+  SRCH --> OpenAI[OpenAI API]
+```
+
+### Search behaviour (summary)
+
+- **With `videoId` (Time Machine, video selected):** frame descriptions for that video are loaded from OpenSearch and sent with the user query to the LLM; the model returns matching timestamps. This avoids brittle single-threshold vector behaviour for short queries on small corpora.
+- **Without `videoId`:** embedding of the query + k-NN vector search in OpenSearch (requires `X-OpenAI-Key` for embedding).
+
+Implementation touchpoints: `OpenAIVisionService.selectMatchingFrames()`, `OpenSearchVectorService.listFramesByVideoId()` / vector query paths, `SearchController`.
+
+## Repository layout
+
+```text
+backend/          Spring Boot service (Maven)
+frontend/         Vue 3 + Vite app
+docker-compose.yml   Zookeeper, Kafka, OpenSearch, backend, frontend
+start-all.ps1     Local dev: Docker then backend + frontend windows
+```
 
 ## Stack
 
-- **Backend**: Java 21, Spring Boot 3.4, Kafka, JavaCV, OpenAI, OpenSearch
-- **Frontend**: Vue 3, Vite, Tailwind, Pinia, Video.js
+- **Backend:** Java 21, Spring Boot 3.4, Spring Kafka, JavaCV, OpenSearch Java client, WebFlux (OpenAI HTTP), Lombok, JUnit 5 / EmbeddedKafka / Testcontainers (tests).
+- **Frontend:** Vue 3, Vite, Tailwind CSS, Pinia, Video.js, Axios.
+- **Ops (local):** Docker Compose (Confluent Kafka 7.5, OpenSearch 2.11).
 
 ## Project status
 
-- **Supported mode:** Local Docker stack only.
+Primary tested path: **local Docker stack** and **local profile** with Kafka + OpenSearch on the host or in Compose. AWS CDK and S3 were removed in favour of filesystem-backed storage for this repo’s scope.
 
 ## Quick start
 
-### One command (PowerShell)
-
-From the project root:
+### One command (PowerShell, project root)
 
 ```powershell
 .\start-all.ps1
 ```
 
-This starts Docker (Kafka, Zookeeper, OpenSearch), then the backend (port 8081), then the frontend (port 5173). Two PowerShell windows will stay open for backend and frontend. Open **http://localhost:5173** when ready.
+Starts Docker (Kafka, Zookeeper, OpenSearch), then backend (8081) and frontend (5173). Open **http://localhost:5173** and set the OpenAI key in the UI when prompted.
 
 ### Manual
 
 ```powershell
-# 1. Docker
 docker-compose up -d
-
-# 2. Backend (local profile → port 8081)
 cd backend; $env:SPRING_PROFILES_ACTIVE="local"; mvn spring-boot:run
-
-# 3. Frontend (proxy points to :8081)
 cd frontend; npm run dev
 ```
 
-Set the OpenAI API key in the UI (session-only, sent as `X-OpenAI-Key`). Upload a video, wait for processing, then use Time Machine search.
-
-**Local Kafka:** With the `local` profile, the ingest topic is `video.ingested.local` (single partition). To verify messages:  
-`docker exec -it <kafka-container> kafka-console-consumer --bootstrap-server localhost:9092 --topic video.ingested.local --from-beginning`  
-Run `docker-compose up -d` from the **project root** so all three containers (Zookeeper, Kafka, OpenSearch) start.
-
-### Full stack in Docker (recommended on Windows)
-
-Run backend and frontend in Docker so Kafka and the API are on the same network. One command brings up everything:
+### Full stack in Docker
 
 ```powershell
-# From project root: build and start all services (Kafka, OpenSearch, backend, frontend)
 docker compose up -d --build
 ```
 
-Open **http://localhost:5173**. The frontend is served by Nginx; `/api` is proxied to the backend. Backend uses `kafka:29092` and `opensearch:9200`, so the ingest → frame-extract → vision/embed pipeline runs correctly.
+Frontend at **http://localhost:5173** (Nginx proxies `/api` to the backend). Backend uses `kafka:29092` and `opensearch:9200` on the Compose network.
 
-### Demo flow (2-3 minutes)
+**Kafka topic check (local profile):** e.g. `video.ingested.local` — use `kafka-console-consumer` against `localhost:9092` from the Kafka container.
 
-1. Open `http://localhost:5173`.
-2. Set your OpenAI key from **Update API Key**.
-3. Upload a short video (5-20s).
-4. Wait for `Processing complete (N frames)`.
-5. Run Time Machine queries like `publish`, `warning`, `finger`.
-6. Click results to jump video to that timestamp.
+### Demo flow
 
-### Architecture (local demo mode)
+1. Open the app, set API key (**Update API Key**).
+2. Upload a short clip (5–20s).
+3. Wait for processing complete and frame count.
+4. Try queries like `publish`, `warning`, `finger` with the video selected.
+5. Click hits to seek the player.
 
-```text
-Frontend (Vue/Nginx)
-   -> Backend API (Spring Boot)
-      -> Kafka (video.ingested.local -> frames.ready)
-      -> Frame extraction (JavaCV, 1 fps)
-      -> OpenAI Vision + Embeddings/LLM comparison
-      -> OpenSearch (frame index + retrieval)
-      -> Local storage (/app/uploads in Docker)
-```
+## HTTP API (short reference)
 
-### Backend
+| Method | Path | Notes |
+|--------|------|--------|
+| `POST` | `/api/videos/upload` | Multipart; optional `X-OpenAI-Key` |
+| `GET` | `/api/videos/{videoId}/playback-url` | Local playback URL |
+| `GET` | `/api/videos/{videoId}/processing-status` | State + `framesIndexed` + message |
+| `GET` | `/api/search?q=...&videoId=...` | LLM match when `videoId` set; vector when omitted |
+| `GET` | `/api/metrics` | In-memory counters (resets on restart) |
 
-- `POST /api/videos/upload` — multipart file + optional `X-OpenAI-Key`
-- `GET /api/videos/{videoId}/playback-url` — local playback URL
-- `GET /api/videos/{videoId}/processing-status` — pipeline state (`queued|extracting|embedding|ready|failed`) + `framesIndexed` + status `message`
-- `GET /api/search?q=...&videoId=...` — **AI comparison** when `videoId` is set (see below); vector search when omitted (requires `X-OpenAI-Key`)
-- `GET /api/metrics` — in-memory counters for processing states + OpenAI retries/timeouts/failures
+Default backend port: **8080** in base config; **8081** with `local` profile / Docker as used in Compose.
 
-### Time Machine Search: AI comparison (why we switched from vector search)
+## Security (zero-trust for the OpenAI key)
 
-Time Machine search uses **AI for the comparison step** when a video is selected (`videoId` is sent). Previously we used **vector (embedding) similarity** plus a score threshold:
-
-- **Why we switched:**  
-  - **Vector + threshold** caused **false negatives**: e.g. searching for "publish" often returned no results even when a frame clearly showed a Publish button, because the embedding of the short query "publish" was just below the similarity threshold when compared to the frame’s description embedding.  
-  - **Vector + threshold** also caused **false positives**: e.g. searching for "animal" could return all frames when none described an animal, because with only a few documents every frame was among the “nearest” and some passed the threshold.  
-  - Tuning a single threshold (e.g. 0.45 or 0.52) could not reliably give both good recall for relevant terms (publish, finger, warning) and good precision for irrelevant ones (animal).
-
-- **Current behaviour:**  
-  When you search with a video selected, the backend loads that video’s **frame descriptions** (from OpenSearch), sends them with your **search query** to the **LLM (GPT-4o)**, and asks which frame(s) match the query by meaning. The model returns the matching timestamps; we map those back to frames and return them. No embedding or score threshold is used for this path.
-
-- **Examples:**  
-  - Query **"publish"** → LLM sees a frame described as “A finger is about to press the Publish button…” and correctly includes that frame.  
-  - Query **"animal"** → LLM sees only descriptions about buttons, screens, and hands → returns no matching timestamps.  
-  - Query **"warning"** → LLM includes the frame whose description mentions a warning message.
-
-- **Fallback:** When no `videoId` is provided (e.g. search across all videos), the backend still uses **vector search** (embed query, k-NN in OpenSearch) so that path remains unchanged.
-
-- **Implementation:** The AI comparison prompt and logic are in `OpenAIVisionService.selectMatchingFrames()`. Frame descriptions are loaded via `OpenSearchVectorService.listFramesByVideoId()`. The LLM is instructed to return a JSON object `{"timestamps": [0, 2, ...]}` of matching frame timestamps (seconds); the backend maps these back to the stored frames and returns them as search hits.
-
-### Zero-Trust
-
-- API key only via `X-OpenAI-Key` header; never in env or config.
-- Frontend stores key in Pinia (memory only); Axios interceptor attaches it.
+- Controllers accept `X-OpenAI-Key` and pass it transiently to services; do not put keys in `.env`, `application.yml`, or server environment for production-style handling of user keys.
+- Frontend: Pinia store (memory) + Axios interceptor on outgoing API calls.
 
 ## Technical assumptions
 
-- OpenAI key is provided per request using `X-OpenAI-Key`; key is never persisted server-side.
-- Frame extraction is fixed at ~1 frame/second; processing cost/latency scales roughly linearly with video duration.
-- In local Docker mode, storage is filesystem-backed (`/app/uploads`) and Kafka/OpenSearch are single-node dev topology.
-- `GET /api/metrics` uses in-memory counters (reset when backend restarts); this is observability for local ops, not durable analytics.
-- `GET /api/videos/{videoId}/processing-status` reflects app-level state tracking and may initialize to `processing` if backend restarts mid-job.
+- OpenAI key per request; not persisted server-side.
+- ~1 frame per second extraction: cost and latency scale roughly linearly with duration.
+- Local OpenSearch/Kafka are single-node dev topology.
+- `/api/metrics` and processing status are best-effort for local ops (not durable analytics; restart can lose in-memory state).
 
-## Known limitations (portfolio scope)
+## Known limitations (current scope)
 
-- Local mode is the primary tested path.
-- For long videos, processing time scales with frame count (1 fps extraction + AI calls per frame).
-- OpenAI rate-limits can still impact throughput under heavy parallel uploads (bounded retries are implemented; no queue backpressure yet).
+- Long videos: many frames → more vision/API work.
+- Heavy parallel uploads: retries exist; queue backpressure is not fully modeled.
+- Primarily validated on local / Compose paths.
 
-## Roadmap
+## Future scope
 
-- Add stronger retry/backpressure controls for high upload concurrency.
-- Add production observability dashboard and alarms.
+Near-term improvements that fit the existing architecture:
+
+- **Resilience:** bounded concurrency, backpressure, and clearer queue semantics for bursts of uploads.
+- **Observability:** structured logging, tracing, and optional metrics export instead of only in-memory counters.
+- **Search:** tunable hybrid retrieval (e.g. vector shortlist + LLM rerank), optional caching of embeddings per frame version.
+- **Product:** user accounts and server-side auth if keys move off pure client-supplied headers; object storage and managed OpenSearch for a hosted deployment.
+
+Larger stretch goals: multi-tenant isolation, regional deployment, and cost controls (batching vision calls, lower fps modes).
 
 ## Tests
 
@@ -133,5 +168,9 @@ Time Machine search uses **AI for the comparison step** when a video is selected
 cd backend && mvn test
 ```
 
-- `VideoUploadIT`: controller test (empty file rejected).
-- `KafkaOpenSearchPipelineIT`: Kafka produce with EmbeddedKafka.
+- `VideoUploadIT` — upload controller validation (e.g. empty file rejected).
+- `KafkaOpenSearchPipelineIT` — Kafka integration with EmbeddedKafka.
+
+## License
+
+See [LICENSE](LICENSE) in the repository (MIT).
