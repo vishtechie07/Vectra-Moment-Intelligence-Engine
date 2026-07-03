@@ -1,0 +1,2 @@
+docs/assets/*.mp4 filter=lfs diff=lfs merge=lfs -text
+infra/test_videos/*.mp4 filter=lfs diff=lfs merge=lfs -text

@@ -16,7 +16,8 @@ terminals/
 
 # Infra artifacts (if folder kept locally)
 infra/cdk.out/
-infra/test_videos/
+infra/test_videos/*
+!infra/test_videos/Donut (15-Second Ad).mp4
 
 # OS
 .DS_Store
@@ -38,4 +39,9 @@ infra/test_videos/
 
 # Test media (avoid committing large binaries)
 test_videos/*.mp4
+
+# Automated demo recordings (keep folder visible; ignore generated media)
+demo-recordings/*.webm
+demo-recordings/*.mp4
+scripts/demo-record/node_modules/
 

@@ -6,6 +6,14 @@ VectraMoment is an end-to-end demo of **semantic video search**: you upload a vi
 
 It is built as a **portfolio-grade, locally runnable stack** (Docker + Spring Boot + Vue): event-driven processing, vector-capable search storage, and a deliberate **LLM-based matching** path for per-video search to reduce false negatives/positives from raw embedding thresholds alone.
 
+## Demo
+
+![VectraMoment dashboard — upload, playback, and Time Machine search](docs/assets/dashboard-screenshot.png)
+
+**[Watch the demo recording](docs/assets/vectramoment-demo.mp4)** — automated browser capture of upload, AI indexing, video playback, and natural-language search across multiple queries.
+
+Sample source clip used in the demo: [`infra/test_videos/Donut (15-Second Ad).mp4`](infra/test_videos/Donut%20(15-Second%20Ad).mp4) (15s). Re-record locally with `.\record-demo.ps1` from the project root.
+
 ## Features
 
 - Multipart video upload with processing status (`queued` → `extracting` → `embedding` → `ready` / `failed`).
@@ -72,6 +80,9 @@ Implementation touchpoints: `OpenAIVisionService.selectMatchingFrames()`, `OpenS
 backend/          Spring Boot service (Maven)
 frontend/         Vue 3 + Vite app
 docker-compose.yml   Zookeeper, Kafka, OpenSearch, backend, frontend
+docs/assets/      README screenshot and demo recording
+record-demo.ps1   Playwright demo recorder (outputs demo-recordings/*.mp4)
+scripts/demo-record/  Node recorder used by record-demo.ps1
 start-all.ps1     Local dev: Docker then backend + frontend windows
 ```
 
@@ -116,10 +127,12 @@ Frontend at **http://localhost:5173** (Nginx proxies `/api` to the backend). Bac
 ### Demo flow
 
 1. Open the app, set API key (**Update API Key**).
-2. Upload a short clip (5–20s).
+2. Upload a short clip (5–20s) — try the bundled [Donut sample](infra/test_videos/Donut%20(15-Second%20Ad).mp4).
 3. Wait for processing complete and frame count.
-4. Try queries like `publish`, `warning`, `finger` with the video selected.
+4. Try queries like `Are there donuts?`, `Is anyone inside a car?` with the video selected.
 5. Click hits to seek the player.
+
+To capture a fresh demo video: `.\record-demo.ps1` (requires `.env` with `OPENAI_KEY`, app on http://localhost:5173).
 
 ## HTTP API (short reference)
 
