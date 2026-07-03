@@ -8,11 +8,11 @@ It is built as a **portfolio-grade, locally runnable stack** (Docker + Spring Bo
 
 ## Demo
 
-![VectraMoment dashboard — upload, playback, and Time Machine search](docs/assets/dashboard-screenshot.png)
+[![Watch the demo recording](docs/assets/dashboard-screenshot.png)](https://drive.google.com/file/d/1azgI4GS4lvG_DgYCz5YmE9ZQLxpwfU9m/view?usp=drive_link)
 
-**[Watch the demo recording](docs/assets/vectramoment-demo.mp4)** — automated browser capture of upload, AI indexing, video playback, and natural-language search across multiple queries.
+**[Watch the demo recording (Google Drive)](https://drive.google.com/file/d/1azgI4GS4lvG_DgYCz5YmE9ZQLxpwfU9m/view?usp=drive_link)** — automated browser capture of upload, AI indexing, video playback, and natural-language search across multiple queries. ([Repo copy](docs/assets/vectramoment-demo.mp4))
 
-Sample source clip used in the demo: [`infra/test_videos/Donut (15-Second Ad).mp4`](infra/test_videos/Donut%20(15-Second%20Ad).mp4) (15s). Re-record locally with `.\record-demo.ps1` from the project root.
+Sample source clip used in the demo: **[Donut (15-Second Ad).mp4 (Google Drive)](https://drive.google.com/file/d/1xOlcx9CevymyuhVHtX7m7L9ecgROlk97/view?usp=drive_link)** (15s). ([Repo copy](infra/test_videos/Donut%20(15-Second%20Ad).mp4)) Re-record locally with `.\record-demo.ps1` from the project root.
 
 ## Features
 
@@ -127,7 +127,7 @@ Frontend at **http://localhost:5173** (Nginx proxies `/api` to the backend). Bac
 ### Demo flow
 
 1. Open the app, set API key (**Update API Key**).
-2. Upload a short clip (5–20s) — try the bundled [Donut sample](infra/test_videos/Donut%20(15-Second%20Ad).mp4).
+2. Upload a short clip (5–20s) — try the [Donut sample on Google Drive](https://drive.google.com/file/d/1xOlcx9CevymyuhVHtX7m7L9ecgROlk97/view?usp=drive_link).
 3. Wait for processing complete and frame count.
 4. Try queries like `Are there donuts?`, `Is anyone inside a car?` with the video selected.
 5. Click hits to seek the player.
